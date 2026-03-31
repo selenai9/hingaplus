@@ -1,12 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import WeatherCard from "@/components/WeatherCard";
 import AlertCard from "@/components/AlertCard";
 import PlannerCard from "@/components/PlannerCard";
-import type { WeatherData, Alert, Crop } from "@/lib/mockData";
+import { weather, alerts, crops } from "@/lib/mockData";
+
+const quickActions = [
+  {
+    id: "weather",
+    label: "Check Weather",
+    icon: "🌦",
+    href: "#weather",
+    description: "Current & forecast",
+  },
+  {
+    id: "planner",
+    label: "Plan Farming",
+    icon: "🌱",
+    href: "#planner",
+    description: "Crop schedule",
+  },
+  {
+    id: "alerts",
+    label: "View Alerts",
+    icon: "🔔",
+    href: "#alerts",
+    description: `${alerts.length} active`,
+  },
+];
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -17,105 +41,6 @@ function getGreeting() {
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [crops, setCrops] = useState<Crop[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [weatherRes, alertsRes, cropsRes] = await Promise.all([
-          fetch("/api/weather"),
-          fetch("/api/alerts"),
-          fetch("/api/crops"),
-        ]);
-
-        const [weatherData, alertsData, cropsData] = await Promise.all([
-          weatherRes.json(),
-          alertsRes.json(),
-          cropsRes.json(),
-        ]);
-
-        setWeather(weatherData);
-        setAlerts(alertsData);
-        setCrops(cropsData);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, []);
-
-  const quickActions = [
-    {
-      id: "weather",
-      label: "Check Weather",
-      icon: "🌦",
-      href: "#weather",
-      description: "Current & forecast",
-    },
-    {
-      id: "planner",
-      label: "Plan Farming",
-      icon: "🌱",
-      href: "#planner",
-      description: "Crop schedule",
-    },
-    {
-      id: "alerts",
-      label: "View Alerts",
-      icon: "🔔",
-      href: "#alerts",
-      description: `${alerts.length} active`,
-    },
-  ];
-
-  if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#f1dac4" }}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
-          className="flex flex-col items-center gap-4"
-        >
-          <span className="text-5xl">🌿</span>
-          <p
-            className="text-lg font-semibold"
-            style={{ color: "#474973" }}
-          >
-            Loading Hinga+...
-          </p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (!weather) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#f1dac4" }}
-      >
-        <div className="flex flex-col items-center gap-4">
-          <span className="text-5xl">⚠️</span>
-          <p
-            className="text-lg font-semibold"
-            style={{ color: "#474973" }}
-          >
-            Failed to load data. Please try again.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
