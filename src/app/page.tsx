@@ -6,31 +6,11 @@ import Navbar from "@/components/Navbar";
 import WeatherCard from "@/components/WeatherCard";
 import AlertCard from "@/components/AlertCard";
 import PlannerCard from "@/components/PlannerCard";
-import { weather, alerts, crops } from "@/lib/mockData";
+import { crops } from "@/lib/mockData";
 
-const quickActions = [
-  {
-    id: "weather",
-    label: "Check Weather",
-    icon: "🌦",
-    href: "#weather",
-    description: "Current & forecast",
-  },
-  {
-    id: "planner",
-    label: "Plan Farming",
-    icon: "🌱",
-    href: "#planner",
-    description: "Crop schedule",
-  },
-  {
-    id: "alerts",
-    label: "View Alerts",
-    icon: "🔔",
-    href: "#alerts",
-    description: `${alerts.length} active`,
-  },
-];
+// ✅ hooks via @/ alias
+import { useWeather } from "@/hooks/useWeather";
+import { useAlerts } from "@/hooks/useAlerts";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -42,24 +22,47 @@ function getGreeting() {
 export default function Home() {
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
+  // ✅ Fetch real data
+  const { weather, loading: weatherLoading } = useWeather();
+  const { alerts, loading: alertsLoading } = useAlerts();
+
+  const quickActions = [
+    {
+      id: "weather",
+      label: "Check Weather",
+      icon: "🌦",
+      href: "#weather",
+      description: "Current & forecast",
+    },
+    {
+      id: "planner",
+      label: "Plan Farming",
+      icon: "🌱",
+      href: "#planner",
+      description: "Crop schedule",
+    },
+    {
+      id: "alerts",
+      label: "View Alerts",
+      icon: "🔔",
+      href: "#alerts",
+      description: `${alerts?.length || 0} active`,
+    },
+  ];
+
   return (
-    <div
-      className="min-h-screen"
-      style={{ backgroundColor: "#f1dac4" }}
-    >
+    <div className="min-h-screen" style={{ backgroundColor: "#f1dac4" }}>
       <Navbar />
 
-      {/* Main content — padded for top & bottom navbars */}
       <main className="max-w-lg mx-auto px-4 pt-24 pb-24 md:pb-8">
 
-        {/* ── Hero / Greeting ── */}
+        {/* ── Hero ── */}
         <section id="home" className="mb-8">
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            {/* Date badge */}
             <div
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-4"
               style={{
@@ -77,7 +80,6 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Greeting */}
             <h1
               className="text-3xl font-extrabold leading-tight mb-1"
               style={{ color: "#0d0c1d" }}
@@ -89,38 +91,59 @@ export default function Home() {
             </p>
           </motion.div>
 
-          {/* Stats strip */}
+          {/* ── Stats ── */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.4 }}
             className="grid grid-cols-3 gap-2 mt-5"
           >
-            {[
-              { label: "Temperature", value: `${weather.temperature}°C`, icon: "🌡️" },
-              { label: "Humidity", value: `${weather.humidity}%`, icon: "💧" },
-              { label: "Wind", value: `${weather.wind} km/h`, icon: "💨" },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="flex flex-col items-center gap-1 p-3 rounded-2xl"
-                style={{
-                  backgroundColor: "rgba(22,27,51,0.05)",
-                  border: "1px solid rgba(22,27,51,0.08)",
-                }}
-              >
-                <span className="text-lg">{stat.icon}</span>
-                <span
-                  className="text-sm font-bold"
-                  style={{ color: "#161b33" }}
-                >
-                  {stat.value}
-                </span>
-                <span className="text-[10px]" style={{ color: "#a69cac" }}>
-                  {stat.label}
-                </span>
+            {weatherLoading || !weather ? (
+              <div className="col-span-3 text-center text-sm text-gray-500">
+                Loading weather...
               </div>
-            ))}
+            ) : (
+              [
+                {
+                  label: "Temperature",
+                  value: `${weather.temperature}°C`,
+                  icon: "🌡️",
+                },
+                {
+                  label: "Humidity",
+                  value: `${weather.humidity}%`,
+                  icon: "💧",
+                },
+                {
+                  label: "Wind",
+                  value: `${weather.wind} km/h`,
+                  icon: "💨",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="flex flex-col items-center gap-1 p-3 rounded-2xl"
+                  style={{
+                    backgroundColor: "rgba(22,27,51,0.05)",
+                    border: "1px solid rgba(22,27,51,0.08)",
+                  }}
+                >
+                  <span className="text-lg">{stat.icon}</span>
+                  <span
+                    className="text-sm font-bold"
+                    style={{ color: "#161b33" }}
+                  >
+                    {stat.value}
+                  </span>
+                  <span
+                    className="text-[10px]"
+                    style={{ color: "#a69cac" }}
+                  >
+                    {stat.label}
+                  </span>
+                </div>
+              ))
+            )}
           </motion.div>
         </section>
 
@@ -128,7 +151,7 @@ export default function Home() {
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.45 }}
+          transition={{ delay: 0.2 }}
           className="mb-8"
         >
           <h2
@@ -137,47 +160,39 @@ export default function Home() {
           >
             Quick Actions
           </h2>
+
           <div className="grid grid-cols-3 gap-3">
             {quickActions.map((action, i) => (
               <motion.a
                 key={action.id}
                 href={action.href}
+                onClick={() => setActiveSection(action.id)}
                 initial={{ opacity: 0, scale: 0.92 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.25 + i * 0.07, duration: 0.35 }}
-                whileHover={{ scale: 1.05, y: -2 }}
+                transition={{ delay: 0.25 + i * 0.07 }}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => setActiveSection(action.id)}
-                className="flex flex-col items-center gap-2 p-4 rounded-3xl cursor-pointer transition-all duration-200"
+                className="flex flex-col items-center gap-2 p-4 rounded-3xl"
                 style={{
                   background:
                     activeSection === action.id
                       ? "linear-gradient(135deg, #474973, #161b33)"
                       : "rgba(22,27,51,0.06)",
-                  border:
-                    activeSection === action.id
-                      ? "none"
-                      : "1.5px solid rgba(22,27,51,0.1)",
-                  boxShadow:
-                    activeSection === action.id
-                      ? "0 8px 24px rgba(71,73,115,0.35)"
-                      : "none",
                 }}
               >
                 <span className="text-2xl">{action.icon}</span>
                 <span
-                  className="text-xs font-bold text-center leading-tight"
+                  className="text-xs font-bold text-center"
                   style={{
                     color:
-                      activeSection === action.id ? "#f1dac4" : "#161b33",
+                      activeSection === action.id
+                        ? "#f1dac4"
+                        : "#161b33",
                   }}
                 >
                   {action.label}
                 </span>
-                <span
-                  className="text-[10px] text-center"
-                  style={{ color: "#a69cac" }}
-                >
+                <span className="text-[10px] text-center text-gray-400">
                   {action.description}
                 </span>
               </motion.a>
@@ -185,59 +200,36 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* ── Weather Card ── */}
-        <motion.section
-          id="weather"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="mb-8"
-        >
-          <h2
-            className="text-sm font-semibold uppercase tracking-widest mb-3"
-            style={{ color: "#a69cac" }}
-          >
+        {/* ── Weather ── */}
+        <motion.section id="weather" className="mb-8">
+          <h2 className="text-sm font-semibold mb-3 text-gray-500">
             Weather
           </h2>
-          <WeatherCard data={weather} />
+          {weatherLoading || !weather ? (
+            <p className="text-sm text-gray-500">Loading weather...</p>
+          ) : (
+            <WeatherCard data={weather} />
+          )}
         </motion.section>
 
         {/* ── Alerts ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="mb-8"
-        >
-          <AlertCard alerts={alerts} />
+        <motion.div className="mb-8">
+          {alertsLoading ? (
+            <p className="text-sm text-gray-500">Loading alerts...</p>
+          ) : (
+            <AlertCard alerts={alerts || []} />
+          )}
         </motion.div>
 
-        {/* ── Crop Planner ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.5 }}
-          className="mb-8"
-        >
+        {/* ── Planner ── */}
+        <motion.div className="mb-8">
           <PlannerCard crops={crops} />
         </motion.div>
 
         {/* ── Footer ── */}
-        <motion.footer
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
-          className="text-center pb-2"
-        >
-          <div
-            className="inline-flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-full"
-            style={{
-              backgroundColor: "rgba(22,27,51,0.06)",
-              color: "#a69cac",
-            }}
-          >
-            <span>🌿</span>
-            <span>Hinga+ · Smart Farming Assistant</span>
+        <motion.footer className="text-center pb-2">
+          <div className="text-xs text-gray-400">
+            🌿 Hinga+ · Smart Farming Assistant
           </div>
         </motion.footer>
       </main>
