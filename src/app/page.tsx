@@ -8,7 +8,7 @@ import AlertCard from "@/components/AlertCard";
 import PlannerCard from "@/components/PlannerCard";
 import { crops } from "@/lib/mockData";
 
-// ✅ hooks via @/ alias
+// ✅ Hooks
 import { useWeather } from "@/hooks/useWeather";
 import { useAlerts } from "@/hooks/useAlerts";
 
@@ -22,9 +22,9 @@ function getGreeting() {
 export default function Home() {
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
-  // ✅ Fetch real data
-  const { weather, loading: weatherLoading } = useWeather();
-  const { alerts, loading: alertsLoading } = useAlerts();
+  // ✅ Your architecture
+  const { weatherData, allLocations, loading, error } = useWeather();
+  const { alerts } = useAlerts(allLocations ?? []);
 
   const quickActions = [
     {
@@ -46,7 +46,7 @@ export default function Home() {
       label: "View Alerts",
       icon: "🔔",
       href: "#alerts",
-      description: `${alerts?.length || 0} active`,
+      description: `${alerts.length} active`,
     },
   ];
 
@@ -56,13 +56,14 @@ export default function Home() {
 
       <main className="max-w-lg mx-auto px-4 pt-24 pb-24 md:pb-8">
 
-        {/* ── Hero ── */}
+        {/* ── Hero Section ── */}
         <section id="home" className="mb-8">
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
+            {/* Date */}
             <div
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-4"
               style={{
@@ -80,43 +81,49 @@ export default function Home() {
               </span>
             </div>
 
+            {/* Greeting */}
             <h1
               className="text-3xl font-extrabold leading-tight mb-1"
               style={{ color: "#0d0c1d" }}
             >
               {getGreeting()}, Selena 👋
             </h1>
+
             <p className="text-base" style={{ color: "#474973" }}>
               Here&apos;s your farm overview for today.
             </p>
           </motion.div>
 
-          {/* ── Stats ── */}
+          {/* ── Stats Strip ── */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.4 }}
+            transition={{ delay: 0.15 }}
             className="grid grid-cols-3 gap-2 mt-5"
           >
-            {weatherLoading || !weather ? (
+            {loading ? (
               <div className="col-span-3 text-center text-sm text-gray-500">
                 Loading weather...
               </div>
-            ) : (
+            ) : error ? (
+              <div className="col-span-3 text-center text-sm text-red-500">
+                {error}
+              </div>
+            ) : weatherData ? (
               [
                 {
                   label: "Temperature",
-                  value: `${weather.temperature}°C`,
+                  value: `${weatherData.temperature}°C`,
                   icon: "🌡️",
                 },
                 {
                   label: "Humidity",
-                  value: `${weather.humidity}%`,
+                  value: `${weatherData.humidity}%`,
                   icon: "💧",
                 },
                 {
                   label: "Wind",
-                  value: `${weather.wind} km/h`,
+                  value: `${weatherData.wind} km/h`,
                   icon: "💨",
                 },
               ].map((stat) => (
@@ -143,7 +150,7 @@ export default function Home() {
                   </span>
                 </div>
               ))
-            )}
+            ) : null}
           </motion.div>
         </section>
 
@@ -192,7 +199,7 @@ export default function Home() {
                 >
                   {action.label}
                 </span>
-                <span className="text-[10px] text-center text-gray-400">
+                <span className="text-[10px] text-gray-400 text-center">
                   {action.description}
                 </span>
               </motion.a>
@@ -200,29 +207,28 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* ── Weather ── */}
+        {/* ── Weather Section ── */}
         <motion.section id="weather" className="mb-8">
           <h2 className="text-sm font-semibold mb-3 text-gray-500">
             Weather
           </h2>
-          {weatherLoading || !weather ? (
+
+          {loading ? (
             <p className="text-sm text-gray-500">Loading weather...</p>
-          ) : (
-            <WeatherCard data={weather} />
-          )}
+          ) : error ? (
+            <p className="text-sm text-red-500">{error}</p>
+          ) : weatherData ? (
+            <WeatherCard data={weatherData} />
+          ) : null}
         </motion.section>
 
-        {/* ── Alerts ── */}
-        <motion.div className="mb-8">
-          {alertsLoading ? (
-            <p className="text-sm text-gray-500">Loading alerts...</p>
-          ) : (
-            <AlertCard alerts={alerts || []} />
-          )}
+        {/* ── Alerts Section ── */}
+        <motion.div className="mb-8" id="alerts">
+          <AlertCard alerts={alerts} />
         </motion.div>
 
-        {/* ── Planner ── */}
-        <motion.div className="mb-8">
+        {/* ── Planner Section ── */}
+        <motion.div className="mb-8" id="planner">
           <PlannerCard crops={crops} />
         </motion.div>
 
