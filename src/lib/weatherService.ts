@@ -7,7 +7,8 @@ import type { WeatherData, ForecastDay } from "@/lib/mockData";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const BASE_URL = "https://api.open-meteo.com/v1/forecast";
+const BASE_URL   = "https://api.open-meteo.com/v1/forecast";
+const TIMEOUT_MS = 8000; // 8 s — generous for low-bandwidth rural connections
 
 export const locations = [
   { name: "Ndora",   lat: -2.604148955489228, lon: 29.830885802434796 },
@@ -54,6 +55,30 @@ export interface LocationWeatherData extends WeatherData {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
+ * fetch() with an AbortController timeout.
+ * Throws a descriptive error if the request stalls beyond TIMEOUT_MS.
+ */
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs = TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch (err) {
+    clearTimeout(timer);
+    if ((err as Error).name === "AbortError") {
+      throw new Error("Weather request timed out. Check your connection.");
+    }
+    throw err;
+  }
+}
+
+/**
  * Maps a WMO weather interpretation code to one of the four UI condition
  * strings that WeatherCard and AlertCard understand.
  */
@@ -62,10 +87,10 @@ function weathercodeToCondition(code: number): WeatherData["condition"] {
   if (code === 2)                                                  return "Partly Cloudy";
   if (code === 3 || code === 45 || code === 48)                   return "Cloudy";
   if (
-    (code >= 51 && code <= 67) ||   // drizzle / rain
-    (code >= 80 && code <= 82) ||   // rain showers
-    (code >= 85 && code <= 86) ||   // snow showers (unlikely in RW, treated as rain)
-    (code >= 95 && code <= 99)      // thunderstorm
+    (code >= 51 && code <= 67) ||
+    (code >= 80 && code <= 82) ||
+    (code >= 85 && code <= 86) ||
+    (code >= 95 && code <= 99)
   )                                                                return "Rainy";
   return "Partly Cloudy";
 }
@@ -80,8 +105,7 @@ function forecastDayLabel(dateStr: string, index: number): string {
 }
 
 /**
- * Derives a forecast condition from daily precipitation probability alone
- * (the daily endpoint doesn't include weathercode per day).
+ * Derives a forecast condition from daily precipitation probability alone.
  */
 function probToCondition(prob: number): WeatherData["condition"] {
   if (prob > 60) return "Rainy";
@@ -92,7 +116,7 @@ function probToCondition(prob: number): WeatherData["condition"] {
 // ── Core functions ────────────────────────────────────────────────────────────
 
 /**
- * Raw fetch from Open-Meteo.  Throws on network / HTTP errors.
+ * Raw fetch from Open-Meteo.  Throws on network / HTTP / timeout errors.
  */
 export async function fetchWeather(
   lat: number,
@@ -107,7 +131,7 @@ export async function fetchWeather(
     timezone:         "auto",
   });
 
-  const res = await fetch(`${BASE_URL}?${params}`);
+  const res = await fetchWithTimeout(`${BASE_URL}?${params}`);
 
   if (!res.ok) {
     throw new Error(
@@ -119,9 +143,7 @@ export async function fetchWeather(
 }
 
 /**
- * Transforms a raw Open-Meteo response into a `LocationWeatherData` object
- * that is compatible with the existing `WeatherData` UI type plus extra fields
- * used by the alert logic.
+ * Transforms a raw Open-Meteo response into a `LocationWeatherData` object.
  */
 export function transformWeatherData(
   raw: OpenMeteoResponse,
@@ -129,19 +151,16 @@ export function transformWeatherData(
 ): LocationWeatherData {
   const { current_weather, hourly, daily } = raw;
 
-  // ── Find the current hour index in the hourly arrays ──────────────────────
-  // Open-Meteo hourly times look like "2025-01-15T14:00" – match by prefix.
-  const nowPrefix = new Date().toISOString().slice(0, 13); // e.g. "2025-01-15T14"
+  const nowPrefix = new Date().toISOString().slice(0, 13);
   const hourIndex = Math.max(
     0,
     hourly.time.findIndex((t) => t.startsWith(nowPrefix))
   );
 
-  const humidity      = hourly.relativehumidity_2m[hourIndex] ?? hourly.relativehumidity_2m[0] ?? 0;
-  const precipitation = hourly.precipitation[hourIndex]        ?? hourly.precipitation[0]        ?? 0;
+  const humidity        = hourly.relativehumidity_2m[hourIndex] ?? hourly.relativehumidity_2m[0] ?? 0;
+  const precipitation   = hourly.precipitation[hourIndex]        ?? hourly.precipitation[0]        ?? 0;
   const rainProbability = daily.precipitation_probability_max[0] ?? 0;
 
-  // ── Build 3-day forecast (skip today at index 0) ──────────────────────────
   const forecast: ForecastDay[] = daily.time
     .slice(1, 4)
     .map((dateStr, i): ForecastDay => {
@@ -159,15 +178,12 @@ export function transformWeatherData(
     });
 
   return {
-    // ── WeatherData fields (match mockData.ts exactly) ─────────────────────
     location:    locationName,
     temperature: Math.round(current_weather.temperature),
     condition:   weathercodeToCondition(current_weather.weathercode),
     humidity:    Math.round(humidity),
     wind:        Math.round(current_weather.windspeed),
     forecast,
-
-    // ── Extended fields (used by alertService) ─────────────────────────────
     rainProbability,
     precipitation,
     windspeed:   current_weather.windspeed,
