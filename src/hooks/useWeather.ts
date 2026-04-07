@@ -1,18 +1,19 @@
 "use client";
 
-// ─────────────────────────────────────────────────────────────────────────────
 // hooks/useWeather.ts
-// Calls /api/weather (our Next.js proxy) instead of Open-Meteo directly.
-// Falls back to localStorage cache when offline or on error.
-// ─────────────────────────────────────────────────────────────────────────────
+// Calls /api/weather (Next.js proxy) first.
+// If the proxy itself fails (network error / deployment issue),
+// falls back to calling Open-Meteo directly from the browser.
+// Falls back to localStorage cache when both sources fail.
 
 import { useState, useEffect, useCallback } from "react";
-import type { LocationWeatherData } from "@/lib/weatherService";
+import {
+  fetchAllLocationsWeather,
+  type LocationWeatherData,
+} from "@/lib/weatherService";
 import type { WeatherData } from "@/lib/mockData";
 
 const CACHE_KEY = "hinga_weather_cache";
-
-// ── Return shape ──────────────────────────────────────────────────────────────
 
 export interface UseWeatherReturn {
   weatherData:  WeatherData | null;
@@ -22,8 +23,6 @@ export interface UseWeatherReturn {
   isStale:      boolean;
   refetch:      () => void;
 }
-
-// ── Cache helpers ─────────────────────────────────────────────────────────────
 
 function readCache(): LocationWeatherData[] | null {
   try {
@@ -38,11 +37,9 @@ function writeCache(data: LocationWeatherData[]) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
   } catch {
-    // storage full or unavailable — silently ignore
+    // storage full — silently ignore
   }
 }
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useWeather(): UseWeatherReturn {
   const [allLocations, setAllLocations] = useState<LocationWeatherData[]>([]);
@@ -62,27 +59,35 @@ export function useWeather(): UseWeatherReturn {
       setIsStale(false);
 
       try {
-        // ✅ Call our own API route — no CORS, runs server-side
-        const res = await fetch("/api/weather");
+        // ── Strategy 1: Next.js API proxy (server-side fetch) ──────────────
+        let data: LocationWeatherData[] | null = null;
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(
-            (body as { error?: string }).error ??
-              `Server error: ${res.status} ${res.statusText}`
-          );
+        try {
+          const res = await fetch("/api/weather", { cache: "no-store" });
+          if (res.ok) {
+            data = await res.json();
+          } else {
+            const body = await res.json().catch(() => ({}));
+            console.warn("[useWeather] proxy error:", (body as { error?: string }).error ?? res.status);
+          }
+        } catch (proxyErr) {
+          // Proxy unreachable (deployment env, network, etc.) — try direct
+          console.warn("[useWeather] proxy unreachable, trying direct fetch:", proxyErr);
         }
 
-        const data: LocationWeatherData[] = await res.json();
+        // ── Strategy 2: Direct browser → Open-Meteo (no proxy needed) ─────
+        if (!data) {
+          data = await fetchAllLocationsWeather();
+        }
 
-        if (!cancelled) {
+        if (!cancelled && data && data.length > 0) {
           setAllLocations(data);
           writeCache(data);
         }
       } catch (err) {
         if (cancelled) return;
 
-        // ── Offline / error fallback ──────────────────────────────────────
+        // ── Strategy 3: localStorage cache ────────────────────────────────
         const cached = readCache();
         if (cached && cached.length > 0) {
           setAllLocations(cached);
@@ -91,7 +96,7 @@ export function useWeather(): UseWeatherReturn {
           setError(
             err instanceof Error
               ? err.message
-              : "Failed to fetch weather data. Check your connection."
+              : "Unable to load weather. Check your internet connection."
           );
         }
       } finally {
@@ -100,13 +105,9 @@ export function useWeather(): UseWeatherReturn {
     }
 
     load();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [tick]);
 
-  // ── Derive primary WeatherData (Ndora = allLocations[0]) ─────────────────
   const weatherData: WeatherData | null =
     allLocations.length > 0
       ? {
