@@ -2,15 +2,12 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // hooks/useWeather.ts
-// Fetches weather for all 3 Rwandan locations.
+// Calls /api/weather (our Next.js proxy) instead of Open-Meteo directly.
 // Falls back to localStorage cache when offline or on error.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  fetchAllLocationsWeather,
-  type LocationWeatherData,
-} from "@/lib/weatherService";
+import type { LocationWeatherData } from "@/lib/weatherService";
 import type { WeatherData } from "@/lib/mockData";
 
 const CACHE_KEY = "hinga_weather_cache";
@@ -18,27 +15,12 @@ const CACHE_KEY = "hinga_weather_cache";
 // ── Return shape ──────────────────────────────────────────────────────────────
 
 export interface UseWeatherReturn {
-  /**
-   * Primary location (Ndora, index 0) shaped as `WeatherData` – ready to
-   * pass directly to `<WeatherCard data={weatherData} />`.
-   * Null while loading or on error.
-   */
-  weatherData: WeatherData | null;
-
-  /**
-   * Full data for all 3 locations, including extended fields like
-   * `rainProbability` and `precipitation` used by the alert logic.
-   */
+  weatherData:  WeatherData | null;
   allLocations: LocationWeatherData[];
-
-  loading: boolean;
-  error:   string | null;
-
-  /** True when the data shown is from cache (i.e. we're offline). */
-  isStale: boolean;
-
-  /** Call this to manually trigger a re-fetch (e.g. a refresh button). */
-  refetch: () => void;
+  loading:      boolean;
+  error:        string | null;
+  isStale:      boolean;
+  refetch:      () => void;
 }
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
@@ -56,7 +38,7 @@ function writeCache(data: LocationWeatherData[]) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
   } catch {
-    // storage full or unavailable – silently ignore
+    // storage full or unavailable — silently ignore
   }
 }
 
@@ -80,11 +62,22 @@ export function useWeather(): UseWeatherReturn {
       setIsStale(false);
 
       try {
-        const data = await fetchAllLocationsWeather();
+        // ✅ Call our own API route — no CORS, runs server-side
+        const res = await fetch("/api/weather");
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(
+            (body as { error?: string }).error ??
+              `Server error: ${res.status} ${res.statusText}`
+          );
+        }
+
+        const data: LocationWeatherData[] = await res.json();
 
         if (!cancelled) {
           setAllLocations(data);
-          writeCache(data);          //  persist fresh data
+          writeCache(data);
         }
       } catch (err) {
         if (cancelled) return;
@@ -93,7 +86,7 @@ export function useWeather(): UseWeatherReturn {
         const cached = readCache();
         if (cached && cached.length > 0) {
           setAllLocations(cached);
-          setIsStale(true);          // show "cached data" indicator in UI
+          setIsStale(true);
         } else {
           setError(
             err instanceof Error
@@ -108,7 +101,9 @@ export function useWeather(): UseWeatherReturn {
 
     load();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [tick]);
 
   // ── Derive primary WeatherData (Ndora = allLocations[0]) ─────────────────
