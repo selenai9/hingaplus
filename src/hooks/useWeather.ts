@@ -2,7 +2,8 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // hooks/useWeather.ts
-// Fetches weather for all 3 Rwandan locations and manages loading / error state.
+// Fetches weather for all 3 Rwandan locations.
+// Falls back to localStorage cache when offline or on error.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from "react";
@@ -11,6 +12,8 @@ import {
   type LocationWeatherData,
 } from "@/lib/weatherService";
 import type { WeatherData } from "@/lib/mockData";
+
+const CACHE_KEY = "hinga_weather_cache";
 
 // ── Return shape ──────────────────────────────────────────────────────────────
 
@@ -31,8 +34,30 @@ export interface UseWeatherReturn {
   loading: boolean;
   error:   string | null;
 
+  /** True when the data shown is from cache (i.e. we're offline). */
+  isStale: boolean;
+
   /** Call this to manually trigger a re-fetch (e.g. a refresh button). */
   refetch: () => void;
+}
+
+// ── Cache helpers ─────────────────────────────────────────────────────────────
+
+function readCache(): LocationWeatherData[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as LocationWeatherData[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: LocationWeatherData[]) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // storage full or unavailable – silently ignore
+  }
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -41,9 +66,9 @@ export function useWeather(): UseWeatherReturn {
   const [allLocations, setAllLocations] = useState<LocationWeatherData[]>([]);
   const [loading,      setLoading]      = useState<boolean>(true);
   const [error,        setError]        = useState<string | null>(null);
+  const [isStale,      setIsStale]      = useState<boolean>(false);
   const [tick,         setTick]         = useState<number>(0);
 
-  // Expose a stable refetch handle
   const refetch = useCallback(() => setTick((n) => n + 1), []);
 
   useEffect(() => {
@@ -52,15 +77,24 @@ export function useWeather(): UseWeatherReturn {
     async function load() {
       setLoading(true);
       setError(null);
+      setIsStale(false);
 
       try {
         const data = await fetchAllLocationsWeather();
 
         if (!cancelled) {
           setAllLocations(data);
+          writeCache(data);          //  persist fresh data
         }
       } catch (err) {
-        if (!cancelled) {
+        if (cancelled) return;
+
+        // ── Offline / error fallback ──────────────────────────────────────
+        const cached = readCache();
+        if (cached && cached.length > 0) {
+          setAllLocations(cached);
+          setIsStale(true);          // show "cached data" indicator in UI
+        } else {
           setError(
             err instanceof Error
               ? err.message
@@ -74,14 +108,10 @@ export function useWeather(): UseWeatherReturn {
 
     load();
 
-    // Cleanup: ignore stale responses if the component unmounts or refetch fires
-    return () => {
-      cancelled = true;
-    };
-  }, [tick]); // re-runs when `refetch()` is called
+    return () => { cancelled = true; };
+  }, [tick]);
 
   // ── Derive primary WeatherData (Ndora = allLocations[0]) ─────────────────
-  // Strip the extended fields so the shape matches mockData.WeatherData exactly.
   const weatherData: WeatherData | null =
     allLocations.length > 0
       ? {
@@ -94,5 +124,5 @@ export function useWeather(): UseWeatherReturn {
         }
       : null;
 
-  return { weatherData, allLocations, loading, error, refetch };
+  return { weatherData, allLocations, loading, error, isStale, refetch };
 }
