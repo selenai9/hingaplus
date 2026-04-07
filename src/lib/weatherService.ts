@@ -1,11 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // lib/weatherService.ts
+// Fetches weather from Open-Meteo and transforms it into UI-ready shapes.
+// Works both server-side (API route) and client-side (browser direct).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { WeatherData, ForecastDay } from "@/lib/mockData";
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const BASE_URL   = "https://api.open-meteo.com/v1/forecast";
-const TIMEOUT_MS = 10000;
+const TIMEOUT_MS = 10000; // 10 s
 
 export const locations = [
   { name: "Ndora",   lat: -2.604148955489228, lon: 29.830885802434796 },
@@ -14,6 +18,8 @@ export const locations = [
 ] as const;
 
 export type Location = (typeof locations)[number];
+
+// ── Internal API response shape ───────────────────────────────────────────────
 
 interface OpenMeteoResponse {
   current_weather: {
@@ -41,11 +47,25 @@ export interface LocationWeatherData extends WeatherData {
   weathercode:     number;
 }
 
-async function fetchWithTimeout(url: string, timeoutMs = TIMEOUT_MS): Promise<Response> {
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * fetch() with an AbortController timeout.
+ * Works in both browser and Node.js environments.
+ */
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs = TIMEOUT_MS
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      // Disable Next.js caching so we always get fresh data
+      cache: "no-store",
+    });
     clearTimeout(timer);
     return res;
   } catch (err) {
@@ -58,15 +78,15 @@ async function fetchWithTimeout(url: string, timeoutMs = TIMEOUT_MS): Promise<Re
 }
 
 function weathercodeToCondition(code: number): WeatherData["condition"] {
-  if (code === 0 || code === 1) return "Sunny";
-  if (code === 2) return "Partly Cloudy";
-  if (code === 3 || code === 45 || code === 48) return "Cloudy";
+  if (code === 0 || code === 1)                                   return "Sunny";
+  if (code === 2)                                                  return "Partly Cloudy";
+  if (code === 3 || code === 45 || code === 48)                   return "Cloudy";
   if (
     (code >= 51 && code <= 67) ||
     (code >= 80 && code <= 82) ||
     (code >= 85 && code <= 86) ||
     (code >= 95 && code <= 99)
-  ) return "Rainy";
+  )                                                                return "Rainy";
   return "Partly Cloudy";
 }
 
@@ -81,43 +101,64 @@ function probToCondition(prob: number): WeatherData["condition"] {
   return "Sunny";
 }
 
-export async function fetchWeather(lat: number, lon: number): Promise<OpenMeteoResponse> {
+// ── Core functions ────────────────────────────────────────────────────────────
+
+export async function fetchWeather(
+  lat: number,
+  lon: number
+): Promise<OpenMeteoResponse> {
   const params = new URLSearchParams({
-    latitude:        lat.toString(),
-    longitude:       lon.toString(),
-    current_weather: "true",
-    hourly:          "precipitation,relativehumidity_2m",
-    daily:           "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-    timezone:        "auto",
+    latitude:         lat.toString(),
+    longitude:        lon.toString(),
+    current_weather:  "true",
+    hourly:           "precipitation,relativehumidity_2m",
+    daily:            "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+    timezone:         "auto",
+    forecast_days:    "7",
   });
 
   const res = await fetchWithTimeout(`${BASE_URL}?${params}`);
+
   if (!res.ok) {
-    throw new Error(`Open-Meteo error for (${lat}, ${lon}): ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Open-Meteo API error for (${lat}, ${lon}): ${res.status} ${res.statusText}`
+    );
   }
+
   return res.json() as Promise<OpenMeteoResponse>;
 }
 
-export function transformWeatherData(raw: OpenMeteoResponse, locationName: string): LocationWeatherData {
+export function transformWeatherData(
+  raw: OpenMeteoResponse,
+  locationName: string
+): LocationWeatherData {
   const { current_weather, hourly, daily } = raw;
+
   const nowPrefix = new Date().toISOString().slice(0, 13);
-  const hourIndex = Math.max(0, hourly.time.findIndex((t) => t.startsWith(nowPrefix)));
+  const hourIndex = Math.max(
+    0,
+    hourly.time.findIndex((t) => t.startsWith(nowPrefix))
+  );
 
   const humidity        = hourly.relativehumidity_2m[hourIndex] ?? hourly.relativehumidity_2m[0] ?? 0;
   const precipitation   = hourly.precipitation[hourIndex]        ?? hourly.precipitation[0]        ?? 0;
   const rainProbability = daily.precipitation_probability_max[0] ?? 0;
 
-  const forecast: ForecastDay[] = daily.time.slice(1, 4).map((dateStr, i): ForecastDay => {
-    const idx     = i + 1;
-    const maxTemp = daily.temperature_2m_max[idx] ?? 0;
-    const minTemp = daily.temperature_2m_min[idx] ?? 0;
-    const prob    = daily.precipitation_probability_max[idx] ?? 0;
-    return {
-      day:       forecastDayLabel(dateStr, idx),
-      temp:      Math.round((maxTemp + minTemp) / 2),
-      condition: probToCondition(prob),
-    };
-  });
+  const forecast: ForecastDay[] = daily.time
+    .slice(1, 4)
+    .map((dateStr, i): ForecastDay => {
+      const dailyIndex = i + 1;
+      const maxTemp  = daily.temperature_2m_max[dailyIndex]  ?? 0;
+      const minTemp  = daily.temperature_2m_min[dailyIndex]  ?? 0;
+      const avgTemp  = Math.round((maxTemp + minTemp) / 2);
+      const prob     = daily.precipitation_probability_max[dailyIndex] ?? 0;
+
+      return {
+        day:       forecastDayLabel(dateStr, dailyIndex),
+        temp:      avgTemp,
+        condition: probToCondition(prob),
+      };
+    });
 
   return {
     location:    locationName,
@@ -133,30 +174,17 @@ export function transformWeatherData(raw: OpenMeteoResponse, locationName: strin
   };
 }
 
-export async function fetchLocationWeather(location: Location): Promise<LocationWeatherData> {
+export async function fetchLocationWeather(
+  location: Location
+): Promise<LocationWeatherData> {
   const raw = await fetchWeather(location.lat, location.lon);
   return transformWeatherData(raw, location.name);
 }
 
 /**
- * Uses Promise.allSettled so a single failing location doesn't break everything.
- * Returns only fulfilled results; throws only if ALL fail.
+ * Fetches all locations in parallel.
+ * Safe to call from both browser and server.
  */
 export async function fetchAllLocationsWeather(): Promise<LocationWeatherData[]> {
-  const results = await Promise.allSettled(
-    locations.map((loc) => fetchLocationWeather(loc))
-  );
-
-  const fulfilled = results
-    .filter((r): r is PromiseFulfilledResult<LocationWeatherData> => r.status === "fulfilled")
-    .map((r) => r.value);
-
-  if (fulfilled.length === 0) {
-    const firstReason = results
-      .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-      .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))[0];
-    throw new Error(firstReason ?? "Failed to fetch weather data for all locations.");
-  }
-
-  return fulfilled;
+  return Promise.all(locations.map((loc) => fetchLocationWeather(loc)));
 }
