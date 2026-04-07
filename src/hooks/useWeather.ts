@@ -1,10 +1,11 @@
 "use client";
 
+// ─────────────────────────────────────────────────────────────────────────────
 // hooks/useWeather.ts
-// Calls /api/weather (Next.js proxy) first.
-// If the proxy itself fails (network error / deployment issue),
-// falls back to calling Open-Meteo directly from the browser.
-// Falls back to localStorage cache when both sources fail.
+// Fetches Open-Meteo DIRECTLY from the browser (client-side).
+// Open-Meteo supports CORS, so no server proxy is needed.
+// Falls back to localStorage cache when offline or on error.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -37,7 +38,7 @@ function writeCache(data: LocationWeatherData[]) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
   } catch {
-    // storage full — silently ignore
+    // storage full or unavailable — silently ignore
   }
 }
 
@@ -59,35 +60,34 @@ export function useWeather(): UseWeatherReturn {
       setIsStale(false);
 
       try {
-        // ── Strategy 1: Next.js API proxy (server-side fetch) ──────────────
-        let data: LocationWeatherData[] | null = null;
+        // ✅ Call Open-Meteo directly from the browser.
+        // Open-Meteo has permissive CORS headers — no proxy needed.
+        const data = await fetchAllLocationsWeather();
 
-        try {
-          const res = await fetch("/api/weather", { cache: "no-store" });
-          if (res.ok) {
-            data = await res.json();
-          } else {
-            const body = await res.json().catch(() => ({}));
-            console.warn("[useWeather] proxy error:", (body as { error?: string }).error ?? res.status);
-          }
-        } catch (proxyErr) {
-          // Proxy unreachable (deployment env, network, etc.) — try direct
-          console.warn("[useWeather] proxy unreachable, trying direct fetch:", proxyErr);
-        }
-
-        // ── Strategy 2: Direct browser → Open-Meteo (no proxy needed) ─────
-        if (!data) {
-          data = await fetchAllLocationsWeather();
-        }
-
-        if (!cancelled && data && data.length > 0) {
+        if (!cancelled) {
           setAllLocations(data);
           writeCache(data);
         }
       } catch (err) {
         if (cancelled) return;
 
-        // ── Strategy 3: localStorage cache ────────────────────────────────
+        // ── Try server-side proxy as secondary fallback ───────────────────
+        try {
+          const res = await fetch("/api/weather");
+          if (res.ok) {
+            const proxyData: LocationWeatherData[] = await res.json();
+            if (!cancelled) {
+              setAllLocations(proxyData);
+              writeCache(proxyData);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch {
+          // proxy also failed — fall through to cache
+        }
+
+        // ── Offline / error fallback to localStorage cache ────────────────
         const cached = readCache();
         if (cached && cached.length > 0) {
           setAllLocations(cached);
@@ -96,7 +96,7 @@ export function useWeather(): UseWeatherReturn {
           setError(
             err instanceof Error
               ? err.message
-              : "Unable to load weather. Check your internet connection."
+              : "Failed to fetch weather data. Check your connection."
           );
         }
       } finally {
@@ -105,7 +105,10 @@ export function useWeather(): UseWeatherReturn {
     }
 
     load();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [tick]);
 
   const weatherData: WeatherData | null =
