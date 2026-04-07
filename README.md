@@ -161,20 +161,6 @@ http://localhost:3000
 
 ---
 
-##  System Workflow
-
-```mermaid
-graph TD
-A[Frontend UI] --> B[API Routes]
-B --> C[Weather API]
-C --> D[Processed Data]
-D --> E[Alert Engine]
-D --> F[Planner Engine]
-E --> G[User Alerts]
-F --> H[Planner Suggestions]
-```
-
----
 
 ##  Deployment
 
