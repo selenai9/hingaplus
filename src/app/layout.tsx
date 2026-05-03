@@ -31,12 +31,6 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  openGraph: {
-    type: "website",
-    siteName: "Hinga+",
-    title: "Hinga+ | Farming Assistant",
-    description: "Smart farming assistant powered by weather intelligence",
-  },
 };
 
 export default function RootLayout({
@@ -50,10 +44,19 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js');
+                });
+              }
+            `,
+          }}
+        />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>
