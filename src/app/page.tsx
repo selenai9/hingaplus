@@ -9,17 +9,18 @@ import PlannerCard from "@/components/PlannerCard";
 import { crops } from "@/lib/mockData";
 import type { WeatherData } from "@/lib/mockData";
 import type { LocationWeatherData } from "@/lib/weatherService";
-
 import { useWeather } from "@/hooks/useWeather";
 import { useAlerts } from "@/hooks/useAlerts";
+import { useLanguage } from "@/lib/LanguageContext";
+import type { TranslationKey } from "@/lib/translations";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getGreeting() {
+function getGreetingKey(): TranslationKey {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return "greetMorning";
+  if (hour < 17) return "greetAfternoon";
+  return "greetEvening";
 }
 
 function toWeatherData(loc: LocationWeatherData): WeatherData {
@@ -74,29 +75,29 @@ export default function Home() {
 
   const { allLocations, loading, error, isStale, refetch } = useWeather();
   const { alerts } = useAlerts(allLocations);
+  const { t } = useLanguage();
 
-  // Active location data — falls back gracefully while loading
-  const activeLoc    = allLocations[activeLocation] ?? null;
-  const weatherData  = activeLoc ? toWeatherData(activeLoc) : null;
+  const activeLoc   = allLocations[activeLocation] ?? null;
+  const weatherData = activeLoc ? toWeatherData(activeLoc) : null;
 
   const quickActions = [
     {
       id:          "weather",
-      label:       "Check Weather",
+      label:       t("checkWeather"),
       icon:        "🌦",
       href:        "#weather",
-      description: "Current & forecast",
+      description: t("checkWeatherDesc"),
     },
     {
       id:          "planner",
-      label:       "Plan Farming",
+      label:       t("planFarming"),
       icon:        "🌱",
       href:        "#planner",
-      description: "Crop schedule",
+      description: t("planFarmingDesc"),
     },
     {
       id:          "alerts",
-      label:       "View Alerts",
+      label:       t("viewAlerts"),
       icon:        "🔔",
       href:        "#alerts",
       description: `${alerts.length} active`,
@@ -139,11 +140,11 @@ export default function Home() {
               className="text-3xl font-extrabold leading-tight mb-1"
               style={{ color: "#0d0c1d" }}
             >
-              {getGreeting()}, Selena 👋
+              {t(getGreetingKey())}, {t("greetName")} 👋
             </h1>
 
             <p className="text-base" style={{ color: "#474973" }}>
-              Here&apos;s your farm overview for today.
+              {t("farmOverview")}
             </p>
 
             {/* Stale data notice */}
@@ -156,12 +157,12 @@ export default function Home() {
                   color:           "#474973",
                 }}
               >
-                <span>⚡ Showing cached data — you appear to be offline.</span>
+                <span>⚡ {t("offlineNotice")}</span>
                 <button
                   onClick={refetch}
                   className="font-semibold underline underline-offset-2"
                 >
-                  Retry
+                  {t("retry")}
                 </button>
               </div>
             )}
@@ -176,7 +177,7 @@ export default function Home() {
           >
             {loading ? (
               <div className="col-span-3 text-center text-sm text-gray-400 py-4">
-                Loading weather…
+                {t("loadingWeather")}
               </div>
             ) : error ? (
               <div className="col-span-3 text-center text-sm text-red-500 py-4">
@@ -185,17 +186,17 @@ export default function Home() {
                   onClick={refetch}
                   className="block mx-auto mt-2 text-xs underline"
                 >
-                  Try again
+                  {t("tryAgain")}
                 </button>
               </div>
             ) : activeLoc ? (
               [
-                { label: "Temperature", value: `${activeLoc.temperature}°C`, icon: "🌡️" },
-                { label: "Humidity",    value: `${activeLoc.humidity}%`,     icon: "💧" },
-                { label: "Wind",        value: `${activeLoc.wind} km/h`,     icon: "💨" },
+                { labelKey: "temperature" as TranslationKey, value: `${activeLoc.temperature}°C`, icon: "🌡️" },
+                { labelKey: "humidity"    as TranslationKey, value: `${activeLoc.humidity}%`,     icon: "💧" },
+                { labelKey: "wind"        as TranslationKey, value: `${activeLoc.wind} km/h`,     icon: "💨" },
               ].map((stat) => (
                 <div
-                  key={stat.label}
+                  key={stat.labelKey}
                   className="flex flex-col items-center gap-1 p-3 rounded-2xl"
                   style={{
                     backgroundColor: "rgba(22,27,51,0.05)",
@@ -207,7 +208,7 @@ export default function Home() {
                     {stat.value}
                   </span>
                   <span className="text-[10px]" style={{ color: "#a69cac" }}>
-                    {stat.label}
+                    {t(stat.labelKey)}
                   </span>
                 </div>
               ))
@@ -226,7 +227,7 @@ export default function Home() {
             className="text-sm font-semibold uppercase tracking-widest mb-3"
             style={{ color: "#a69cac" }}
           >
-            Quick Actions
+            {t("quickActions")}
           </h2>
 
           <div className="grid grid-cols-3 gap-3">
@@ -271,7 +272,7 @@ export default function Home() {
             className="text-sm font-semibold uppercase tracking-widest mb-3"
             style={{ color: "#a69cac" }}
           >
-            Weather
+            {t("weather")}
           </h2>
 
           {loading ? (
@@ -280,7 +281,7 @@ export default function Home() {
               style={{ background: "linear-gradient(135deg, #474973 0%, #161b33 100%)" }}
             >
               <p className="text-sm" style={{ color: "#a69cac" }}>
-                Fetching live weather…
+                {t("fetchingWeather")}
               </p>
             </div>
           ) : error && !weatherData ? (
@@ -294,12 +295,11 @@ export default function Home() {
                 className="text-xs underline"
                 style={{ color: "#474973" }}
               >
-                Try again
+                {t("tryAgain")}
               </button>
             </div>
           ) : (
             <>
-              {/* Location tab switcher */}
               {allLocations.length > 1 && (
                 <LocationTabs
                   locations={allLocations}
@@ -307,7 +307,6 @@ export default function Home() {
                   onChange={setActiveLocation}
                 />
               )}
-
               <AnimatePresence mode="wait">
                 {weatherData && (
                   <motion.div
@@ -338,7 +337,7 @@ export default function Home() {
         {/* ── Footer ── */}
         <motion.footer className="text-center pb-2">
           <div className="text-xs text-gray-400">
-            🌿 Hinga+ · Smart Farming Assistant
+            🌿 {t("footerText")}
           </div>
         </motion.footer>
       </main>
