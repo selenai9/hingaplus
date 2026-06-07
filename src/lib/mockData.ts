@@ -59,8 +59,8 @@ export const alerts: Alert[] = [
 ];
 
 export const crops: Crop[] = [
-  { id: "1", name: "Maize", day: "Monday", status: "Good", icon: "🌽" },
-  { id: "2", name: "Beans", day: "Wednesday", status: "Risky", icon: "🫘" },
-  { id: "3", name: "Tomatoes", day: "Thursday", status: "Good", icon: "🍅" },
-  { id: "4", name: "Sorghum", day: "Friday", status: "Risky", icon: "🌾" },
+  { id: "1", name: "Ibigori", day: "Monday", status: "Good", icon: "🌽" },
+  { id: "2", name: "Ibishyimbo", day: "Wednesday", status: "Risky", icon: "🫘" },
+  { id: "3", name: "Inyanya", day: "Thursday", status: "Good", icon: "🍅" },
+  { id: "4", name: "Uburo "Friday", status: "Risky", icon: "🌾" },
 ];
