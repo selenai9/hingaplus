@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const navLinks = [
-  { label: "Home", href: "#home", icon: "🏠" },
-  { label: "Weather", href: "#weather", icon: "🌦" },
-  { label: "Planner", href: "#planner", icon: "🌱" },
-  { label: "Alerts", href: "#alerts", icon: "🔔" },
-];
+import LanguageToggle from "@/components/LanguageToggle";
+import { useLanguage } from "@/lib/LanguageContext";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [active, setActive] = useState("Home");
+  const { t } = useLanguage();
+
+  const navLinks = [
+    { labelKey: "navHome",    label: t("navHome"),    href: "#home",    icon: "🏠" },
+    { labelKey: "navWeather", label: t("navWeather"), href: "#weather", icon: "🌦" },
+    { labelKey: "navPlanner", label: t("navPlanner"), href: "#planner", icon: "🌱" },
+    { labelKey: "navAlerts",  label: t("navAlerts"),  href: "#alerts",  icon: "🔔" },
+  ];
 
   return (
     <>
@@ -22,6 +25,7 @@ export default function Navbar() {
         className="fixed top-0 left-0 right-0 z-50 shadow-lg"
       >
         <div className="max-w-lg mx-auto px-4 h-16 flex items-center justify-between">
+
           {/* Logo */}
           <div className="flex items-center gap-2">
             <span className="text-2xl">🌿</span>
@@ -34,18 +38,18 @@ export default function Navbar() {
             </span>
           </div>
 
-          {/* Desktop nav links */}
+          {/* Desktop: nav links + language toggle */}
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
-              <a
-                key={link.label}
+              
+                key={link.labelKey}
                 href={link.href}
-                onClick={() => setActive(link.label)}
+                onClick={() => setActive(link.labelKey)}
                 className="px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200"
                 style={{
-                  color: active === link.label ? "#f1dac4" : "#a69cac",
+                  color: active === link.labelKey ? "#f1dac4" : "#a69cac",
                   backgroundColor:
-                    active === link.label
+                    active === link.labelKey
                       ? "rgba(71,73,115,0.6)"
                       : "transparent",
                 }}
@@ -53,41 +57,47 @@ export default function Navbar() {
                 {link.label}
               </a>
             ))}
+            <div className="ml-2">
+              <LanguageToggle />
+            </div>
           </div>
 
-          {/* Mobile hamburger */}
-          <button
-            className="md:hidden flex flex-col gap-1.5 p-2 rounded-xl transition-all duration-200"
-            style={{ color: "#f1dac4" }}
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-label="Toggle menu"
-          >
-            <span
-              className="block w-5 h-0.5 transition-all duration-300 origin-center"
-              style={{
-                backgroundColor: "#f1dac4",
-                transform: menuOpen
-                  ? "rotate(45deg) translateY(7px)"
-                  : "none",
-              }}
-            />
-            <span
-              className="block w-5 h-0.5 transition-all duration-300"
-              style={{
-                backgroundColor: "#f1dac4",
-                opacity: menuOpen ? 0 : 1,
-              }}
-            />
-            <span
-              className="block w-5 h-0.5 transition-all duration-300 origin-center"
-              style={{
-                backgroundColor: "#f1dac4",
-                transform: menuOpen
-                  ? "rotate(-45deg) translateY(-7px)"
-                  : "none",
-              }}
-            />
-          </button>
+          {/* Mobile: language toggle + hamburger */}
+          <div className="md:hidden flex items-center gap-2">
+            <LanguageToggle />
+            <button
+              className="flex flex-col gap-1.5 p-2 rounded-xl transition-all duration-200"
+              style={{ color: "#f1dac4" }}
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="Toggle menu"
+            >
+              <span
+                className="block w-5 h-0.5 transition-all duration-300 origin-center"
+                style={{
+                  backgroundColor: "#f1dac4",
+                  transform: menuOpen
+                    ? "rotate(45deg) translateY(7px)"
+                    : "none",
+                }}
+              />
+              <span
+                className="block w-5 h-0.5 transition-all duration-300"
+                style={{
+                  backgroundColor: "#f1dac4",
+                  opacity: menuOpen ? 0 : 1,
+                }}
+              />
+              <span
+                className="block w-5 h-0.5 transition-all duration-300 origin-center"
+                style={{
+                  backgroundColor: "#f1dac4",
+                  transform: menuOpen
+                    ? "rotate(-45deg) translateY(-7px)"
+                    : "none",
+                }}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Mobile dropdown */}
@@ -103,18 +113,18 @@ export default function Navbar() {
             >
               <div className="max-w-lg mx-auto px-4 py-3 flex flex-col gap-1">
                 {navLinks.map((link) => (
-                  <a
-                    key={link.label}
+                  
+                    key={link.labelKey}
                     href={link.href}
                     onClick={() => {
-                      setActive(link.label);
+                      setActive(link.labelKey);
                       setMenuOpen(false);
                     }}
                     className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200"
                     style={{
-                      color: active === link.label ? "#f1dac4" : "#a69cac",
+                      color: active === link.labelKey ? "#f1dac4" : "#a69cac",
                       backgroundColor:
-                        active === link.label
+                        active === link.labelKey
                           ? "rgba(71,73,115,0.5)"
                           : "transparent",
                     }}
@@ -139,22 +149,22 @@ export default function Navbar() {
       >
         <div className="max-w-lg mx-auto flex items-center justify-around h-16">
           {navLinks.map((link) => (
-            <a
-              key={link.label}
+            
+              key={link.labelKey}
               href={link.href}
-              onClick={() => setActive(link.label)}
+              onClick={() => setActive(link.labelKey)}
               className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all duration-200"
             >
               <span className="text-xl leading-none">{link.icon}</span>
               <span
                 className="text-[10px] font-medium"
                 style={{
-                  color: active === link.label ? "#f1dac4" : "#a69cac",
+                  color: active === link.labelKey ? "#f1dac4" : "#a69cac",
                 }}
               >
                 {link.label}
               </span>
-              {active === link.label && (
+              {active === link.labelKey && (
                 <span
                   className="w-1 h-1 rounded-full"
                   style={{ backgroundColor: "#474973" }}
