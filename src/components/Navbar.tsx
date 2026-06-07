@@ -7,14 +7,14 @@ import { useLanguage } from "@/lib/LanguageContext";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [active, setActive] = useState("Home");
+  const [active, setActive] = useState("navHome");
   const { t } = useLanguage();
 
   const navLinks = [
-    { labelKey: "navHome",    label: t("navHome"),    href: "#home",    icon: "🏠" },
-    { labelKey: "navWeather", label: t("navWeather"), href: "#weather", icon: "🌦" },
-    { labelKey: "navPlanner", label: t("navPlanner"), href: "#planner", icon: "🌱" },
-    { labelKey: "navAlerts",  label: t("navAlerts"),  href: "#alerts",  icon: "🔔" },
+    { key: "navHome",    label: t("navHome"),    href: "#home",    icon: "🏠" },
+    { key: "navWeather", label: t("navWeather"), href: "#weather", icon: "🌦" },
+    { key: "navPlanner", label: t("navPlanner"), href: "#planner", icon: "🌱" },
+    { key: "navAlerts",  label: t("navAlerts"),  href: "#alerts",  icon: "🔔" },
   ];
 
   return (
@@ -42,14 +42,14 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
               
-                key={link.labelKey}
+                key={link.key}
                 href={link.href}
-                onClick={() => setActive(link.labelKey)}
+                onClick={() => setActive(link.key)}
                 className="px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200"
                 style={{
-                  color: active === link.labelKey ? "#f1dac4" : "#a69cac",
+                  color: active === link.key ? "#f1dac4" : "#a69cac",
                   backgroundColor:
-                    active === link.labelKey
+                    active === link.key
                       ? "rgba(71,73,115,0.6)"
                       : "transparent",
                 }}
@@ -114,17 +114,17 @@ export default function Navbar() {
               <div className="max-w-lg mx-auto px-4 py-3 flex flex-col gap-1">
                 {navLinks.map((link) => (
                   
-                    key={link.labelKey}
+                    key={link.key}
                     href={link.href}
                     onClick={() => {
-                      setActive(link.labelKey);
+                      setActive(link.key);
                       setMenuOpen(false);
                     }}
                     className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200"
                     style={{
-                      color: active === link.labelKey ? "#f1dac4" : "#a69cac",
+                      color: active === link.key ? "#f1dac4" : "#a69cac",
                       backgroundColor:
-                        active === link.labelKey
+                        active === link.key
                           ? "rgba(71,73,115,0.5)"
                           : "transparent",
                     }}
@@ -150,21 +150,21 @@ export default function Navbar() {
         <div className="max-w-lg mx-auto flex items-center justify-around h-16">
           {navLinks.map((link) => (
             
-              key={link.labelKey}
+              key={link.key}
               href={link.href}
-              onClick={() => setActive(link.labelKey)}
+              onClick={() => setActive(link.key)}
               className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all duration-200"
             >
               <span className="text-xl leading-none">{link.icon}</span>
               <span
                 className="text-[10px] font-medium"
                 style={{
-                  color: active === link.labelKey ? "#f1dac4" : "#a69cac",
+                  color: active === link.key ? "#f1dac4" : "#a69cac",
                 }}
               >
                 {link.label}
               </span>
-              {active === link.labelKey && (
+              {active === link.key && (
                 <span
                   className="w-1 h-1 rounded-full"
                   style={{ backgroundColor: "#474973" }}
